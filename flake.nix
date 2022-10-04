@@ -19,6 +19,7 @@
         config.cudaSupport = useCuda;
         config.allowUnfree = true;
         overlays = [
+          (import ./overlays/kenlm.nix)
           (final: prev: {
             # Reassigning python3 to python39 so that arrow-cpp
             # will be built using it.
@@ -70,7 +71,17 @@
         inherit python;
         projectDir = ./.;
         preferWheels = true;
+        extraPackages = ps: [ps.kenlm];
         overrides = poetry2nix.overrides.withDefaults (pyfinal: pyprev: rec {
+          kenlm = let
+            inherit (pkgs) kenlm;
+          in
+            pyprev.buildPythonPackage {
+              pname = "kenlm";
+              inherit (kenlm) src version nativeBuildInputs buildInputs;
+              dontUseCmakeConfigure = true;
+            };
+
           pandas = pyprev.pandas.overridePythonAttrs (old: {
             # current poetry2nix override fails at postPatch
             # on darwin and it looks like it is only needed
@@ -156,7 +167,7 @@
     in {
       devShell = pkgs.mkShell {
         buildInputs =
-          [pythonEnv]
+          [pythonEnv pkgs.kenlm]
           ++ lib.optionals useCuda [
             nvidia_x11
             cudatoolkit
