@@ -19,7 +19,8 @@ from transformers import (
 set_seed(1234)
 data_dir = Path(
     os.getenv(
-        "DATA_DIR", Path(__file__).parent / "data" / "text" / "language_identification"
+        "DATA_DIR",
+        Path(__file__).parent.parent / "data" / "text" / "language_identification",
     )
 )
 output_dir = Path(os.getenv("OUTPUT_DIR", Path(__file__).parent / "output"))
