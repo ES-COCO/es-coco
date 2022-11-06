@@ -64,7 +64,7 @@
         ];
       };
       inherit (pkgs) poetry2nix lib stdenv fetchurl fetchFromGitHub;
-      inherit (pkgs.cudaPackages) cudatoolkit;
+      inherit (pkgs.cudaPackages_11_5) cudatoolkit;
       inherit (pkgs.linuxPackages) nvidia_x11;
       python = pkgs.python39;
       pythonEnv = poetry2nix.mkPoetryEnv {
@@ -127,11 +127,44 @@
               })
             else pyprev.torch;
 
+          torchaudio =
+            if useCuda
+            then
+              pyprev.torchaudio.overridePythonAttrs (old: {
+                inherit (old) pname version;
+                src = fetchurl {
+                  url = "https://download.pytorch.org/whl/cu115/torchaudio-0.11.0%2Bcu115-cp39-cp39-linux_x86_64.whl";
+                  sha256 = "sha256-MWOerHO+qoFmfJyMiMCczDwI7oBK+CdImMp99Mgxi90=";
+                };
+                # without that autoPatchelfHook will fail because cudatoolkit is not in LD_LIBRARY_PATH
+                autoPatchelfIgnoreMissingDeps = true;
+                buildInputs =
+                  (old.buildInputs or [])
+                  ++ [pyfinal.torch cudatoolkit];
+                preConfigure = ''
+                  export LD_LIBRARY_PATH="$LD_LIBRARY_PATH:${pyfinal.torch}/${python.sitePackages}/torch/lib:${lib.makeLibraryPath [cudatoolkit "${cudatoolkit}"]}"
+                '';
+              })
+            else pyprev.torchaudio;
+
           cffi = pyprev.cffi.overridePythonAttrs (old: {
             # Current poetry2nix override appears to be broken: `substitute(): ERROR: file 'setup.py' does not exist`.
             # https://github.com/nix-community/poetry2nix/blob/abc47c71a4920e654e7b2e4261e3e6399bbe2be6/overrides/default.nix#L260
             prePatch = null;
           });
+
+          soundfile = pyprev.soundfile.overridePythonAttrs (old: let
+            inherit (pkgs) libsndfile;
+          in {
+            # Current poetry2nix override appears to be broken: `substitute(): ERROR: file 'soundfile.py' does not exist`.
+            postPatch = null;
+            propagatedBuildInputs = (old.propagatedBuildInputs or []) ++ [libsndfile];
+            # This does not work in postPatch, but does seem to work in postInstall
+            postInstall = ''
+              substituteInPlace "$out/${python.sitePackages}/soundfile.py" --replace "_find_library('sndfile')" "'${libsndfile.out}/lib/libsndfile${stdenv.hostPlatform.extensions.sharedLibrary}'"
+            '';
+          });
+
           # Provide non-python dependencies.
           watchfiles = pyprev.watchfiles.overridePythonAttrs (old: let
             inherit (old) pname version;
@@ -165,6 +198,7 @@
         });
       };
     in {
+      soundfile = python.pkgs.soundfile.derivation;
       devShell = pkgs.mkShell {
         buildInputs =
           [pythonEnv pkgs.kenlm]
