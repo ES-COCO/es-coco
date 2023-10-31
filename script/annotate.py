@@ -1,39 +1,152 @@
-import sqlite3
+from csv import DictReader
+from pathlib import Path
+from typing import List, Optional
 
-from pydantic import BaseModel
+import typer
+from sqlalchemy import create_engine
+from sqlalchemy.orm import Session
+from sqlalchemy.sql import Select, func, select
+from transformers import AutoModelForTokenClassification, AutoTokenizer, pipeline
 
-from code_switching import schema
-
-
-def insert_data_into_database(db_file: str, data_model: BaseModel):
-    conn = sqlite3.connect(db_file)
-    cursor = conn.cursor()
-
-    table_name = data_model.__class__.__name__
-    fields = ", ".join(
-        [field for field in data_model.__dict__["__annotations__"].keys()]
-    )
-    values = [getattr(data_model, field) for field in fields]
-
-    placeholders = ", ".join(["?"] * len(fields))
-    insert_query = f"INSERT INTO {table_name} ({fields}) VALUES ({placeholders})"
-
-    cursor.execute(insert_query, values)
-    conn.commit()
-    conn.close()
-
-
-# Example usage:
-data_source = DataSources(
-    id=1,
-    name="Example Source",
-    url="http://example.com",
-    format="JSON",
-    creator="John Doe",
-    content="Sample data",
-    size="100 MB",
-    modality="Text",
-    tagged=1,
-    scripted=0,
+from code_switching.schema import (
+    Annotation,
+    AnnotationSource,
+    AnnotationType,
+    DataSource,
+    Segment,
+    Token,
 )
-insert_data_into_database("your_database.db", data_source)
+from code_switching.schema import initialize as initialize_db
+
+iso_lookup = {"en": "eng", "spa": "spa"}
+
+
+class LocalIdManager:
+    def __init__(self, schema, session: Session):
+        self.current_id: int = session.scalar(select(func.max(schema.id))) or 1
+
+    def next_id(self) -> int:
+        i = self.current_id
+        self.current_id += 1
+        return i
+
+
+def get_one(query: Select, session: Session):
+    result = session.scalar(query)
+    assert result is not None
+    return result
+
+
+def main(path: Path, model_name: str, source_name: str, db: Optional[Path] = None):
+    prev_db_exists = db and db.exists()
+    engine = create_engine(f"sqlite:///{db or ':memory:'}")
+
+    # Initialize the DB tables if the DB didn't exist already
+    if not prev_db_exists:
+        initialize_db(engine)
+
+    lid_pretrained = "sagorsarker/codeswitch-spaeng-lid-lince"
+    pos_pretrained = "sagorsarker/codeswitch-spaeng-pos-lince"
+
+    lid_tokenizer = AutoTokenizer.from_pretrained(lid_pretrained)
+    lid_model = AutoModelForTokenClassification.from_pretrained(lid_pretrained)
+    lid_pipe = pipeline(
+        "token-classification", model=lid_model, tokenizer=lid_tokenizer
+    )
+    pos_tokenizer = AutoTokenizer.from_pretrained(pos_pretrained)
+    pos_model = AutoModelForTokenClassification.from_pretrained(pos_pretrained)
+    pos_pipe = pipeline(
+        "token-classification", model=pos_model, tokenizer=pos_tokenizer
+    )
+
+    with Session(engine) as session:
+        segment_ids = LocalIdManager(Segment, session)
+        token_ids = LocalIdManager(Token, session)
+
+        # Fetch the metadata
+        source = get_one(
+            select(DataSource).where(DataSource.name == source_name), session
+        )
+        model = get_one(
+            select(AnnotationSource).where(AnnotationSource.name == model_name), session
+        )
+        lid_model = get_one(
+            select(AnnotationSource).where(
+                AnnotationSource.url == f"https://huggingface.co/{lid_pretrained}"
+            ),
+            session,
+        )
+        pos_model = get_one(
+            select(AnnotationSource).where(
+                AnnotationSource.url == f"https://huggingface.co/{pos_pretrained}"
+            ),
+            session,
+        )
+        lid_type = get_one(
+            select(AnnotationType).where(AnnotationType.name == "language"), session
+        )
+        pos_type = get_one(
+            select(AnnotationType).where(AnnotationType.name == "pos"), session
+        )
+
+        if any(x is None for x in (source, model, lid_model, pos_model)):
+            raise RuntimeError("Source or model is not in database!")
+
+        with Session(engine) as session:
+            segments = []
+            tokens = []
+            annotations = []
+            with path.open("r") as f:
+                reader = DictReader(f)
+                for row in reader:
+                    text = row["text"]
+                    # Skip [music], [singing], etc.
+                    if text.startswith("[") and text.endswith("]"):
+                        continue
+                    # Clean up artifacts that are introduced occasionally
+                    if text.startswith(">>"):
+                        text.replace(">>", "")
+                    segment = Segment(
+                        id=segment_ids.next_id(),
+                        start_ms=row["start"],
+                        end_ms=row["end"],
+                        data_source_id=source.id,
+                    )
+
+                    # Run annotation pipelines
+                    lid_out: List[dict] = lid_pipe(text)  # type: ignore
+                    pos_out: List[dict] = pos_pipe(text)  # type: ignore
+                    for lid, pos in zip(lid_out, pos_out):
+                        assert lid["word"] == pos["word"]
+                        token = Token(
+                            id=token_ids.next_id(),
+                            surface_form=lid["word"],
+                            token_index=lid["index"],
+                            segment_id=segment.id,
+                            transcription_source_id=model.id,
+                        )
+                        tokens.append(token)
+                        annotations.append(
+                            Annotation(
+                                value=iso_lookup.get(lid["entity"], "n/a"),
+                                confidence=lid["score"],
+                                token_id=token.id,
+                                annotation_type_id=lid_type.id,
+                                annotation_source_id=lid_model.id,
+                            )
+                        )
+                        annotations.append(
+                            Annotation(
+                                value=pos["entity"],
+                                confidence=pos["score"],
+                                token_id=token.id,
+                                annotation_type_id=pos_type.id,
+                                annotation_source_id=pos_model.id,
+                            )
+                        )
+            session.bulk_save_objects(segments + tokens + annotations)
+            session.commit()
+
+
+if __name__ == "__main__":
+    typer.run(main)
