@@ -101,6 +101,7 @@ def initialize(engine: Engine):
                 audio_fmt,
                 text_fmt,
                 AnnotationType(name="language"),
+                AnnotationType(name="switch"),
                 AnnotationType(name="pos"),
                 AnnotationSource(
                     name="whisper-small",

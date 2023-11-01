@@ -1,0 +1,50 @@
+.app {
+  display: flex;
+  flex-direction: column;
+  gap: var(--size-fluid-1);
+}
+
+.token {
+  display: inline-flex;
+  flex-direction: column;
+  align-content: center;
+  align-items: center;
+  border-radius: var(--radius-3);
+  padding: var(--size-2);
+  background-color: var(--brand);
+  &:hover {
+      box-shadow: var(--shadow-3);
+  }
+}
+
+.pos {
+  font-size: var(--font-size-00);
+  font-variant: small-caps;
+  color: var(--text-2);
+}
+
+.segment {
+  display: flex;
+  flex-direction: row;
+  gap: var(--size-1);
+  width: fit-content;
+}
+
+.card {
+  background-color: var(--surface-2);
+  border-radius: var(--radius-2);
+  padding: var(--size-fluid-2);
+  box-shadow: var(--shadow-2);
+  @media (--motionOK) {
+    animation: var(--animation-fade-in);
+  }
+}
+
+.english {
+  background-color: var(--color-english);
+}
+
+.spanish {
+  background-color: var(--color-spanish);
+}
+

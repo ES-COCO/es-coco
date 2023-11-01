@@ -1,0 +1,15 @@
+@import "open-props/normalize";
+@import "open-props/style";
+
+:root {
+  --color-english: var(--indigo-3);
+  --color-spanish: var(--teal-3);
+  @media (prefers-color-scheme: dark) {
+    --color-english: var(--indigo-7);
+    --color-spanish: var(--teal-7);
+  }
+}
+
+html {
+  padding: var(--size-fluid-2);
+}

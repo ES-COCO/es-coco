@@ -1,0 +1,2 @@
+- [ ] Combine consecutive segments at annotation time until sentence end (e.g. using punctuation) 
+- [ ] Combine words either at annotation time or render time

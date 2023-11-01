@@ -19,6 +19,7 @@ from code_switching.schema import (
 from code_switching.schema import initialize as initialize_db
 
 iso_lookup = {"en": "eng", "spa": "spa"}
+languages = list(iso_lookup.values())
 
 
 class LocalIdManager:
@@ -88,6 +89,9 @@ def main(path: Path, model_name: str, source_name: str, db: Optional[Path] = Non
         pos_type = get_one(
             select(AnnotationType).where(AnnotationType.name == "pos"), session
         )
+        switch_type = get_one(
+            select(AnnotationType).where(AnnotationType.name == "switch"), session
+        )
 
         if any(x is None for x in (source, model, lid_model, pos_model)):
             raise RuntimeError("Source or model is not in database!")
@@ -98,6 +102,7 @@ def main(path: Path, model_name: str, source_name: str, db: Optional[Path] = Non
             annotations = []
             with path.open("r") as f:
                 reader = DictReader(f)
+                texts = []
                 for row in reader:
                     text = row["text"]
                     # Skip [music], [singing], etc.
@@ -112,7 +117,13 @@ def main(path: Path, model_name: str, source_name: str, db: Optional[Path] = Non
                         end_ms=row["end"],
                         data_source_id=source.id,
                     )
+                    segments.append(segment)
+                    texts.append((text, segment.id))
 
+                prev_token = None
+                prev_lang = None
+                prev_lang_conf = None
+                for text, segment_id in texts:
                     # Run annotation pipelines
                     lid_out: List[dict] = lid_pipe(text)  # type: ignore
                     pos_out: List[dict] = pos_pipe(text)  # type: ignore
@@ -122,14 +133,16 @@ def main(path: Path, model_name: str, source_name: str, db: Optional[Path] = Non
                             id=token_ids.next_id(),
                             surface_form=lid["word"],
                             token_index=lid["index"],
-                            segment_id=segment.id,
+                            segment_id=segment_id,
                             transcription_source_id=model.id,
                         )
                         tokens.append(token)
+                        lang = iso_lookup.get(lid["entity"], "n/a")
+                        lang_conf = lid["score"]
                         annotations.append(
                             Annotation(
-                                value=iso_lookup.get(lid["entity"], "n/a"),
-                                confidence=lid["score"],
+                                value=lang,
+                                confidence=lang_conf,
                                 token_id=token.id,
                                 annotation_type_id=lid_type.id,
                                 annotation_source_id=lid_model.id,
@@ -144,6 +157,34 @@ def main(path: Path, model_name: str, source_name: str, db: Optional[Path] = Non
                                 annotation_source_id=pos_model.id,
                             )
                         )
+
+                        if (
+                            prev_token is not None
+                            and prev_lang != lang
+                            and (prev_lang in languages)
+                            and (lang in languages)
+                        ):
+                            annotations.append(
+                                Annotation(
+                                    value="from",
+                                    confidence=prev_lang_conf * lang_conf,
+                                    token_id=prev_token.id,
+                                    annotation_type_id=switch_type.id,
+                                    annotation_source_id=lid_model.id,
+                                )
+                            )
+                            annotations.append(
+                                Annotation(
+                                    value="into",
+                                    confidence=prev_lang_conf * lang_conf,
+                                    token_id=token.id,
+                                    annotation_type_id=switch_type.id,
+                                    annotation_source_id=lid_model.id,
+                                )
+                            )
+                        prev_token = token
+                        prev_lang = lang
+                        prev_lang_conf = lang_conf
             session.bulk_save_objects(segments + tokens + annotations)
             session.commit()
 

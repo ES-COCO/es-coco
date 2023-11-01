@@ -21,6 +21,7 @@
               poetry
               ffmpeg
               openai-whisper-cpp
+              nodePackages.pnpm
             ]
             ++ lib.optionals stdenv.isDarwin apple_deps;
 
