@@ -261,16 +261,35 @@ def main(path: Path, model_name: str, source_name: str, db: Optional[Path] = Non
             for t in word_tokens:
                 t.word_id = word_id
             for (type_id, source_id), anns in annotations[(s_id, w_id)].items():
+                # For language switches, don't aggregate:
+                # Instead, keep both from + into annotations on the same word
+                if type_id == switch_type.id:
+                    for a in anns:
+                        word_annotation_id = word_annotation_ids.next_id()
+                        a.word_annotation_id = word_annotation_id
+                        WordAnnotation(
+                            id=word_annotation_id,
+                            value=a.value,
+                            confidence=a.confidence,
+                            word_id=word_id,
+                            annotation_type_id=type_id,
+                            annotation_source_id=source_id,
+                        )
+                    continue
+                
+                # Decide the word's annotation value by taking a vote
+                # across all of the token's values using the token-level
+                # confidence scores.
                 word_annotation_id = word_annotation_ids.next_id()
                 ann_values = defaultdict(lambda: 0.0)
                 for a in anns:
-                    # TODO: handle switches differently
                     a.word_annotation_id = word_annotation_id
                     ann_values[a.value] += a.confidence
                 value, confidence = max(ann_values.items(), key=lambda k: k[1])
                 confidence /= sum(ann_values.values())
                 word_annotations.append(
                     WordAnnotation(
+                        id=word_annotation_id,
                         value=value,
                         confidence=confidence,
                         word_id=word_id,
