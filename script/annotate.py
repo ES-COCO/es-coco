@@ -1,3 +1,4 @@
+import re
 from collections import defaultdict
 from csv import DictReader
 from itertools import chain
@@ -96,12 +97,11 @@ def read_segments(
         cur_end = None
         for row in reader:
             text = row["text"]
-            # Skip [music], [singing], etc.
-            if text.startswith("[") and text.endswith("]"):
-                continue
             # Clean up artifacts that are introduced occasionally
-            if text.startswith(">>"):
-                text.replace(">>", "")
+            text = text.lstrip(" >").strip()
+            text = re.sub(r"\[.+?\] ?", "", text)
+            if not text:
+                continue
 
             cur_text += text
             cur_end = row["end"]
@@ -269,14 +269,16 @@ def main(path: Path, model_name: str, source_name: str, db: Optional[Path] = Non
                     for a in anns:
                         word_annotation_id = word_annotation_ids.next_id()
                         a.word_annotation_id = word_annotation_id
-                        word_annotations.append(WordAnnotation(
-                            id=word_annotation_id,
-                            value=a.value,
-                            confidence=a.confidence,
-                            word_id=word_id,
-                            annotation_type_id=type_id,
-                            annotation_source_id=source_id,
-                        ))
+                        word_annotations.append(
+                            WordAnnotation(
+                                id=word_annotation_id,
+                                value=a.value,
+                                confidence=a.confidence,
+                                word_id=word_id,
+                                annotation_type_id=type_id,
+                                annotation_source_id=source_id,
+                            )
+                        )
                     continue
 
                 # Decide the word's annotation value by taking a vote
