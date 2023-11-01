@@ -166,14 +166,14 @@ def main(path: Path, model_name: str, source_name: str, db: Optional[Path] = Non
         for text, segment_id in texts:
             lid_out: List[dict] = lid_pipe(text)  # type: ignore
             pos_out: List[dict] = pos_pipe(text)  # type: ignore
-            tokenizer_word_ids: List[int] = lid_tokenizer(
+            tokenizer_word_inds: List[int] = lid_tokenizer(
                 text, add_special_tokens=False
             ).word_ids()
             prev_token = None
             prev_lang = None
             prev_lang_conf = None
-            prev_w_id = None
-            for lid, pos, w_id in zip(lid_out, pos_out, tokenizer_word_ids):
+            prev_w_idx = None
+            for lid, pos, w_idx in zip(lid_out, pos_out, tokenizer_word_inds):
                 assert lid["word"] == pos["word"]
                 token_text = lid["word"]
                 token = Token(
@@ -183,7 +183,7 @@ def main(path: Path, model_name: str, source_name: str, db: Optional[Path] = Non
                     segment_id=segment_id,
                     transcription_source_id=model.id,
                 )
-                tokens[(segment_id, w_id)].append(token)
+                tokens[(segment_id, w_idx)].append(token)
                 lang = iso_lookup.get(lid["entity"], "n/a")
                 lang_conf = lid["score"]
                 lang_annotation = TokenAnnotation(
@@ -194,9 +194,9 @@ def main(path: Path, model_name: str, source_name: str, db: Optional[Path] = Non
                     annotation_source_id=lid_model_meta.id,
                 )
 
-                annotations[(segment_id, w_id)][(lid_type.id, lid_model_meta.id)].append(
-                    lang_annotation
-                )
+                annotations[(segment_id, w_idx)][
+                    (lid_type.id, lid_model_meta.id)
+                ].append(lang_annotation)
 
                 pos_annotation = TokenAnnotation(
                     value=pos["entity"],
@@ -205,9 +205,9 @@ def main(path: Path, model_name: str, source_name: str, db: Optional[Path] = Non
                     annotation_type_id=pos_type.id,
                     annotation_source_id=pos_model_meta.id,
                 )
-                annotations[(segment_id, w_id)][(pos_type.id, pos_model_meta.id)].append(
-                    pos_annotation
-                )
+                annotations[(segment_id, w_idx)][
+                    (pos_type.id, pos_model_meta.id)
+                ].append(pos_annotation)
 
                 language_switched = all(
                     (
@@ -218,7 +218,7 @@ def main(path: Path, model_name: str, source_name: str, db: Optional[Path] = Non
                     )
                 )
                 if language_switched:
-                    annotations[(segment_id, w_id)][
+                    annotations[(segment_id, w_idx)][
                         (switch_type.id, lid_model_meta.id)
                     ].append(
                         TokenAnnotation(
@@ -229,7 +229,7 @@ def main(path: Path, model_name: str, source_name: str, db: Optional[Path] = Non
                             annotation_source_id=lid_model_meta.id,
                         )
                     )
-                    annotations[(segment_id, prev_w_id)][(switch_type.id, lid_model_meta.id)].append(  # type: ignore
+                    annotations[(segment_id, prev_w_idx)][(switch_type.id, lid_model_meta.id)].append(  # type: ignore
                         TokenAnnotation(
                             value="into",
                             confidence=prev_lang_conf * lang_conf,
@@ -238,7 +238,7 @@ def main(path: Path, model_name: str, source_name: str, db: Optional[Path] = Non
                             annotation_source_id=lid_model_meta.id,
                         )
                     )
-                prev_w_id = w_id
+                prev_w_idx = w_idx
                 prev_token = token
                 prev_lang = lang
                 prev_lang_conf = lang_conf
@@ -247,7 +247,7 @@ def main(path: Path, model_name: str, source_name: str, db: Optional[Path] = Non
         word_annotation_ids = LocalIdManager(WordAnnotation, session)
         words: List[Word] = []
         word_annotations: List[WordAnnotation] = []
-        for (s_id, w_id), word_tokens in tokens.items():
+        for (s_id, w_idx), word_tokens in tokens.items():
             word_id = word_ids.next_id()
             word_surface_form = lid_tokenizer.convert_tokens_to_string(
                 [t.surface_form for t in word_tokens]
@@ -256,27 +256,29 @@ def main(path: Path, model_name: str, source_name: str, db: Optional[Path] = Non
                 Word(
                     id=word_id,
                     surface_form=word_surface_form,
+                    segment_id=word_tokens[0].segment_id,
+                    word_index=w_idx,
                 )
             )
             for t in word_tokens:
                 t.word_id = word_id
-            for (type_id, source_id), anns in annotations[(s_id, w_id)].items():
+            for (type_id, source_id), anns in annotations[(s_id, w_idx)].items():
                 # For language switches, don't aggregate:
                 # Instead, keep both from + into annotations on the same word
                 if type_id == switch_type.id:
                     for a in anns:
                         word_annotation_id = word_annotation_ids.next_id()
                         a.word_annotation_id = word_annotation_id
-                        WordAnnotation(
+                        word_annotations.append(WordAnnotation(
                             id=word_annotation_id,
                             value=a.value,
                             confidence=a.confidence,
                             word_id=word_id,
                             annotation_type_id=type_id,
                             annotation_source_id=source_id,
-                        )
+                        ))
                     continue
-                
+
                 # Decide the word's annotation value by taking a vote
                 # across all of the token's values using the token-level
                 # confidence scores.
@@ -301,7 +303,9 @@ def main(path: Path, model_name: str, source_name: str, db: Optional[Path] = Non
             chain(
                 segments,
                 chain.from_iterable(tokens.values()),
-                chain.from_iterable(chain.from_iterable(d.values() for d in annotations.values())),
+                chain.from_iterable(
+                    chain.from_iterable(d.values() for d in annotations.values())
+                ),
                 words,
                 word_annotations,
             )

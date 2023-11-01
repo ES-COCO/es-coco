@@ -1,4 +1,4 @@
-import { For, Component, Show, createResource, Resource } from "solid-js";
+import { For, Component, createResource, Resource } from "solid-js";
 
 import initSqlJs, { Database } from "sql.js";
 import dbUrl from "../../data/test.db?url";
@@ -8,10 +8,10 @@ import "./App.css";
 interface Segment {
   id: number;
   sourceName: string;
-  tokens: Token[];
+  tokens: Word[];
 }
 
-interface Token {
+interface Word {
   id: number;
   surface_form: string;
   annotations: Annotation[];
@@ -44,27 +44,12 @@ function queryToMaps(
 const Segment: Component<{ data: Segment }> = (props) => {
   return (
     <div class="segment card">
-      <For each={props.data.tokens}>
-        {(t, i) => {
-          const nextToken = props.data.tokens[i() + 1];
-          const addSpace =
-            nextToken &&
-            !t.surface_form.match(/['\-]$/) &&
-            !nextToken.surface_form.startsWith("##") &&
-            !nextToken.surface_form.match(/[',.?¿"\-]/);
-          return (
-            <>
-              <Token data={t} />
-              <Show when={addSpace}> </Show>
-            </>
-          );
-        }}
-      </For>
+      <For each={props.data.tokens}>{(t) => <Word data={t} />}</For>
     </div>
   );
 };
 
-const Token: Component<{ data: Token }> = (props) => {
+const Word: Component<{ data: Word }> = (props) => {
   const d = props.data;
   const language = d.annotations.filter((a) => a.type == "language")[0].value;
   const tag = d.annotations.filter((a) => a.type == "pos")[0].value;
@@ -94,35 +79,37 @@ const App: Component = () => {
       db,
       `
       SELECT DISTINCT s.id, s.start_ms, s.end_ms, d.name as source_name
-      FROM TokenAnnotations AS a
+      FROM WordAnnotations AS a
       JOIN AnnotationTypes AS at ON a.annotation_type_id = at.id
-      JOIN Tokens AS t ON a.token_id = t.id
-      JOIN Segments AS s ON t.segment_id = s.id
+      JOIN Words AS w ON a.word_id = w.id
+      JOIN Segments AS s ON w.segment_id = s.id
       JOIN DataSources AS d ON s.data_source_id = d.id
       WHERE at.name = 'switch';
       `,
     );
+    console.log(segments);
     const placeholders = "?,".repeat(segments.length).slice(0, -1);
     const segment_ids = segments.map((s) => s.get("id"));
     const surface_forms = queryToMaps(
       db,
       `
       SELECT segment_id, id, surface_form
-      FROM Tokens
+      FROM Words
       WHERE segment_id IN (${placeholders})
-      ORDER BY segment_id, token_index;
+      ORDER BY segment_id, word_index;
       `,
       ...segment_ids,
     );
+    console.log(surface_forms);
     const annotations = queryToMaps(
       db,
       `
-      SELECT t.id as token_id, at.name as type, a.value
-      FROM Tokens as t
-      JOIN TokenAnnotations AS a ON a.token_id = t.id
+      SELECT w.id as word_id, at.name as type, a.value
+      FROM Words as w
+      JOIN WordAnnotations AS a ON a.word_id = w.id
       JOIN AnnotationTypes AS at ON a.annotation_type_id = at.id
-      WHERE t.segment_id IN (${placeholders})
-      ORDER BY t.segment_id, t.token_index, at.name;
+      WHERE w.segment_id IN (${placeholders})
+      ORDER BY w.segment_id, w.word_index, at.name;
       `,
       ...segment_ids,
     );
@@ -138,21 +125,21 @@ const App: Component = () => {
       } as Segment);
     }
 
-    const tokens: Map<number, Token> = new Map();
+    const words: Map<number, Word> = new Map();
     for (const t of surface_forms) {
       const id = t.get("id") as number;
-      const token = {
+      const word = {
         id,
         surface_form: t.get("surface_form"),
         annotations: [],
-      } as Token;
-      tokens.set(id, token);
-      result.get(t.get("segment_id") as number)!.tokens.push(token);
+      } as Word;
+      words.set(id, word);
+      result.get(t.get("segment_id") as number)!.tokens.push(word);
     }
 
     for (const a of annotations) {
-      const token = tokens.get(a.get("token_id") as number)!;
-      token.annotations.push({
+      const word = words.get(a.get("word_id") as number)!;
+      word.annotations.push({
         type: a.get("type"),
         value: a.get("value"),
       } as Annotation);

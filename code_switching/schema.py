@@ -74,6 +74,9 @@ class Word(Base):
     surface_form: Mapped[str] = mapped_column()
     tokens: Mapped[List["Token"]] = relationship(back_populates="word")
     annotations: Mapped[List["WordAnnotation"]] = relationship(back_populates="word")
+    segment_id: Mapped[int] = mapped_column(ForeignKey("Segments.id"))
+    segment: Mapped["Segment"] = relationship()
+    word_index: Mapped[int] = mapped_column()
 
 
 class Segment(Base):
