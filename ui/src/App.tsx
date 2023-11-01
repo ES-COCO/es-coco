@@ -1,7 +1,7 @@
 import { For, Component, createResource, Resource } from "solid-js";
 
 import initSqlJs, { Database } from "sql.js";
-import dbUrl from "../../data/test.db?url";
+import dbUrl from "./assets/escoco.db?url";
 import sqlJsWasm from "../node_modules/sql.js/dist/sql-wasm.wasm?url";
 import "./App.css";
 
@@ -87,7 +87,6 @@ const App: Component = () => {
       WHERE at.name = 'switch';
       `,
     );
-    console.log(segments);
     const placeholders = "?,".repeat(segments.length).slice(0, -1);
     const segment_ids = segments.map((s) => s.get("id"));
     const surface_forms = queryToMaps(
@@ -100,7 +99,6 @@ const App: Component = () => {
       `,
       ...segment_ids,
     );
-    console.log(surface_forms);
     const annotations = queryToMaps(
       db,
       `
