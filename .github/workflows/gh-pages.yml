@@ -6,6 +6,9 @@ on:
       - main
 jobs:
   deploy:
+    defaults:
+      run:
+        working-directory: ui
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -29,4 +32,4 @@ jobs:
         if: github.ref == 'refs/heads/main'
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./public
+          publish_dir: /public
