@@ -1,14 +1,10 @@
-import { For, createSignal, Component, Show } from "solid-js";
+import { For, Component, Show, createResource, Resource } from "solid-js";
 
 import initSqlJs, { Database } from "sql.js";
 import dbUrl from "../../data/test.db?url";
 import sqlJsWasm from "../node_modules/sql.js/dist/sql-wasm.wasm?url";
 import "./App.css";
 
-const sqlPromise = initSqlJs({ locateFile: () => sqlJsWasm });
-const dataPromise = fetch(dbUrl).then((res) => res.arrayBuffer());
-const [SQL, buf] = await Promise.all([sqlPromise, dataPromise]);
-const db = new SQL.Database(new Uint8Array(buf));
 
 interface Segment {
   id: number;
@@ -28,11 +24,15 @@ interface Annotation {
 }
 
 function queryToMaps(
-  db: Database,
+  db: Resource<Database>,
   query: string,
   ...params: any[]
 ): Map<string, string | number>[] {
-  const result = db.exec(query, params)[0];
+  const connection = db();
+  if (!connection) {
+    return [];
+  }
+  const result = connection.exec(query, params)[0];
   return result.values.map((values) => {
     const m = new Map();
     for (let i = 0; i < result.columns.length; i++) {
@@ -77,9 +77,13 @@ const Token: Component<{ data: Token }> = (props) => {
 };
 
 const App: Component = () => {
-  const [query, setQuery] = createSignal("");
+  const [db] = createResource(async () => {
+    const sqlPromise = initSqlJs({ locateFile: () => sqlJsWasm });
+    const dataPromise = fetch(dbUrl).then((res) => res.arrayBuffer());
+    const [SQL, buf] = await Promise.all([sqlPromise, dataPromise]);
+    return new SQL.Database(new Uint8Array(buf));
+  })
   const segments = () => {
-    query();
     const segments = queryToMaps(
       db,
       `
