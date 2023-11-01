@@ -5,7 +5,6 @@ import dbUrl from "../../data/test.db?url";
 import sqlJsWasm from "../node_modules/sql.js/dist/sql-wasm.wasm?url";
 import "./App.css";
 
-
 interface Segment {
   id: number;
   sourceName: string;
@@ -67,13 +66,20 @@ const Segment: Component<{ data: Segment }> = (props) => {
 
 const Token: Component<{ data: Token }> = (props) => {
   const d = props.data;
-  const language = d.annotations.filter(a => a.type == "language")[0].value;
-  const tag = d.annotations.filter(a => a.type == "pos")[0].value;
-  return <div classList={{
-    token: true,
-    english: language == "eng",
-    spanish: language == "spa",
-  }}>{d.surface_form.replace("##", "")}<div class="pos">{tag}</div></div>;
+  const language = d.annotations.filter((a) => a.type == "language")[0].value;
+  const tag = d.annotations.filter((a) => a.type == "pos")[0].value;
+  return (
+    <div
+      classList={{
+        token: true,
+        english: language == "eng",
+        spanish: language == "spa",
+      }}
+    >
+      {d.surface_form.replace("##", "")}
+      <div class="pos">{tag}</div>
+    </div>
+  );
 };
 
 const App: Component = () => {
@@ -82,13 +88,13 @@ const App: Component = () => {
     const dataPromise = fetch(dbUrl).then((res) => res.arrayBuffer());
     const [SQL, buf] = await Promise.all([sqlPromise, dataPromise]);
     return new SQL.Database(new Uint8Array(buf));
-  })
+  });
   const segments = () => {
     const segments = queryToMaps(
       db,
       `
       SELECT DISTINCT s.id, s.start_ms, s.end_ms, d.name as source_name
-      FROM Annotations AS a
+      FROM TokenAnnotations AS a
       JOIN AnnotationTypes AS at ON a.annotation_type_id = at.id
       JOIN Tokens AS t ON a.token_id = t.id
       JOIN Segments AS s ON t.segment_id = s.id
@@ -113,7 +119,7 @@ const App: Component = () => {
       `
       SELECT t.id as token_id, at.name as type, a.value
       FROM Tokens as t
-      JOIN Annotations AS a ON a.token_id = t.id
+      JOIN TokenAnnotations AS a ON a.token_id = t.id
       JOIN AnnotationTypes AS at ON a.annotation_type_id = at.id
       WHERE t.segment_id IN (${placeholders})
       ORDER BY t.segment_id, t.token_index, at.name;

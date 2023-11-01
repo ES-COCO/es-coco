@@ -63,7 +63,17 @@ class Token(Base):
     transcription_source: Mapped["AnnotationSource"] = relationship()
     segment_id: Mapped[int] = mapped_column(ForeignKey("Segments.id"))
     segment: Mapped["Segment"] = relationship()
-    annotations: Mapped[List["Annotation"]] = relationship(back_populates="token")
+    annotations: Mapped[List["TokenAnnotation"]] = relationship(back_populates="token")
+    word_id: Mapped[int] = mapped_column(ForeignKey("Words.id"))
+    word: Mapped["Word"] = relationship(back_populates="tokens")
+
+
+class Word(Base):
+    __tablename__ = "Words"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    surface_form: Mapped[str] = mapped_column()
+    tokens: Mapped[List["Token"]] = relationship(back_populates="word")
+    annotations: Mapped[List["WordAnnotation"]] = relationship(back_populates="word")
 
 
 class Segment(Base):
@@ -76,13 +86,29 @@ class Segment(Base):
     data_source: Mapped["DataSource"] = relationship()
 
 
-class Annotation(Base):
-    __tablename__ = "Annotations"
+class TokenAnnotation(Base):
+    __tablename__ = "TokenAnnotations"
     id: Mapped[int] = mapped_column(primary_key=True)
     value: Mapped[str] = mapped_column()
     confidence: Mapped[float] = mapped_column()
     token_id: Mapped[int] = mapped_column(ForeignKey("Tokens.id"))
     token: Mapped["Token"] = relationship(back_populates="annotations")
+    annotation_type_id: Mapped[int] = mapped_column(ForeignKey("AnnotationTypes.id"))
+    annotation_type: Mapped["AnnotationType"] = relationship()
+    annotation_source_id: Mapped[int] = mapped_column(
+        ForeignKey("AnnotationSources.id")
+    )
+    annotation_source: Mapped["AnnotationSource"] = relationship()
+    word_annotation_id: Mapped[int] = mapped_column(ForeignKey("WordAnnotations.id"))
+
+
+class WordAnnotation(Base):
+    __tablename__ = "WordAnnotations"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    value: Mapped[str] = mapped_column()
+    confidence: Mapped[float] = mapped_column()
+    word_id: Mapped[int] = mapped_column(ForeignKey("Words.id"))
+    word: Mapped["Word"] = relationship(back_populates="annotations")
     annotation_type_id: Mapped[int] = mapped_column(ForeignKey("AnnotationTypes.id"))
     annotation_type: Mapped["AnnotationType"] = relationship()
     annotation_source_id: Mapped[int] = mapped_column(
