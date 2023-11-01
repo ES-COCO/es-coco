@@ -12,4 +12,5 @@ ffmpeg -i "$input_path" -ar 16000 -ac 1 -c:a pcm_s16le "$wav_path" \
     --output-file "$out_path" \
     --processors 4 \
     --output-csv "$wav_path" \
+    "${@:3}" \
   && rm -f "$wav_path"
