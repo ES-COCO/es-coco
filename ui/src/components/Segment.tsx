@@ -59,10 +59,19 @@ export function fetchSegments(segmentIds: number[]): SegmentData[] {
   return Array.from(segments.values());
 }
 
-export const Segment: Component<{ data: SegmentData }> = (props) => {
+export const Segment: Component<{ data: SegmentData; selected: boolean }> = (
+  props,
+) => {
+  const { data, selected } = props;
   return (
-    <div class="segment card">
-      <For each={props.data.words}>{(t) => <Word data={t} />}</For>
+    <div
+      classList={{
+        card: true,
+        segment: true,
+        selected,
+      }}
+    >
+      <For each={data.words}>{(t) => <Word data={t} />}</For>
     </div>
   );
 };

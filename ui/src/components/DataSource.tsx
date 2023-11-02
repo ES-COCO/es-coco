@@ -1,11 +1,10 @@
-import { Component, Resource } from "solid-js";
+import { Component, For } from "solid-js";
 
-import { Database } from "sql.js";
 import "./App.css";
 
-import { SegmentData } from "./Segment";
 import { z } from "zod";
-import { db, placeholders, queryToMaps } from "../sql";
+import { placeholders, queryToArray, queryToIds, queryToMaps } from "../sql";
+import { Segment, fetchSegments } from "./Segment";
 
 export const DataSourceData = z.object({
   id: z.string(),
@@ -17,7 +16,6 @@ export type DataSourceData = z.infer<typeof DataSourceData>;
 function fetchDataSources(dataSourceIds: number[]) {
   return z.array(DataSourceData).parse(
     queryToMaps(
-      db,
       `
     SELECT id, name, url
     FROM DataSources
@@ -34,9 +32,16 @@ function fetchDataSources(dataSourceIds: number[]) {
   );
 }
 
-// export const DataSource: Component<{
-//   data: DataSourceData;
-//   selectedSegmentId: number;
-// }> = (props) => {
-//   const { data, selectedSegmentId } = props;
-// };
+export const DataSource: Component<{
+  data: DataSourceData;
+  selectedSegmentId: number;
+}> = (props) => {
+  const { data, selectedSegmentId } = props;
+  const segmentIds = queryToIds(`
+    SELECT id
+    FROM Segments
+    WHERE data_source_id = ?
+  `, data.id);
+  const segments = fetchSegments(segmentIds);
+  return <For each={segments}>{(s) => <Segment data={s} selected={s.id === selectedSegmentId} />}</For>
+};

@@ -2,6 +2,7 @@ import { createResource } from "solid-js";
 import initSqlJs from "sql.js";
 import dbUrl from "./assets/escoco.db?url";
 import sqlJsWasm from "../node_modules/sql.js/dist/sql-wasm.wasm?url";
+import { z } from "zod";
 
 export const [db] = createResource(async () => {
   const sqlPromise = initSqlJs({ locateFile: () => sqlJsWasm });
@@ -20,6 +21,10 @@ export function queryToArray(query: string, ...params: any[]) {
     return [];
   }
   return connection.exec(query, params)[0].values.flat();
+}
+
+export function queryToIds(query: string, ...params: any[]) {
+  return z.array(z.number()).parse(queryToArray(query, ...params));
 }
 
 export function queryToMaps(
