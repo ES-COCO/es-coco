@@ -1,7 +1,6 @@
-import { For, Component, Resource } from "solid-js";
+import { For, Component } from "solid-js";
 import { Word, WordData, fetchWords } from "./Word";
-import { placeholders, queryToArray, queryToMaps } from "../sql";
-import { Database } from "sql.js";
+import { db, placeholders, queryToArray, queryToMaps } from "../sql";
 import { z } from "zod";
 
 export const SegmentData = z.object({
@@ -13,17 +12,13 @@ export const SegmentData = z.object({
 });
 export type SegmentData = z.infer<typeof SegmentData>;
 
-export function fetchSegments(
-  db: Resource<Database>,
-  segmentIds: number[],
-): SegmentData[] {
+export function fetchSegments(segmentIds: number[]): SegmentData[] {
   const connection = db();
   if (!connection) {
     return [];
   }
   const segments = new Map(
     queryToMaps(
-      db,
       `
       SELECT DISTINCT s.id, s.start_ms as start, s.end_ms as end, d.name as source_name
       FROM Segments as s
@@ -45,7 +40,6 @@ export function fetchSegments(
   );
   const wordIds = z.array(z.number()).parse(
     queryToArray(
-      db,
       `
       SELECT id
       FROM Words
@@ -54,7 +48,7 @@ export function fetchSegments(
       ...segmentIds,
     ),
   );
-  for (const w of fetchWords(db, wordIds)) {
+  for (const w of fetchWords(wordIds)) {
     const segment = segments.get(w.segmentId);
     if (segment) {
       segment.words.push(w);
