@@ -103,7 +103,7 @@ def read_segments(
             if not text:
                 continue
 
-            cur_text += text
+            cur_text += " " + text
             cur_end = row["end"]
             if cur_start is None:
                 cur_start = row["start"]
