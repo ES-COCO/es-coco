@@ -1,19 +1,16 @@
 import { Component, For } from "solid-js";
 
-import "./App.css";
-
 import { z } from "zod";
-import { placeholders, queryToArray, queryToIds, queryToMaps } from "../sql";
+import { placeholders, queryToIds, queryToMaps } from "../sql";
 import { Segment, fetchSegments } from "./Segment";
 
 export const DataSourceData = z.object({
-  id: z.string(),
+  id: z.number(),
   name: z.string(),
   url: z.string(),
 });
 export type DataSourceData = z.infer<typeof DataSourceData>;
-
-function fetchDataSources(dataSourceIds: number[]) {
+export function fetchDataSources(dataSourceIds: number[]) {
   return z.array(DataSourceData).parse(
     queryToMaps(
       `
@@ -37,11 +34,20 @@ export const DataSource: Component<{
   selectedSegmentId: number;
 }> = (props) => {
   const { data, selectedSegmentId } = props;
-  const segmentIds = queryToIds(`
+  const segmentIds = queryToIds(
+    `
     SELECT id
     FROM Segments
     WHERE data_source_id = ?
-  `, data.id);
+  `,
+    data.id,
+  );
   const segments = fetchSegments(segmentIds);
-  return <For each={segments}>{(s) => <Segment data={s} selected={s.id === selectedSegmentId} />}</For>
+  return (
+    <div class="data-source">
+      <For each={segments}>
+        {(s) => <Segment data={s} selected={s.id === selectedSegmentId} />}
+      </For>
+    </div>
+  );
 };

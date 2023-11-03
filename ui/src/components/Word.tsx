@@ -70,7 +70,7 @@ export const Word: Component<{ data: WordData }> = (props) => {
       }}
     >
       {d.surfaceForm.replace("##", "")}
-      <div class="pos">{tag}</div>
+      <div class="pos">{d.surfaceForm.match(/[0-9.'",!?]/) ? undefined : tag }</div>
     </div>
   );
 };

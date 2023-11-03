@@ -1,6 +1,8 @@
 .app {
   display: flex;
   flex-direction: column;
+  align-content: center;
+  align-items: center;
   gap: var(--size-fluid-2);
 }
 
@@ -11,7 +13,6 @@
   align-items: center;
   border-radius: var(--radius-2);
   padding: var(--size-2);
-  background-color: var(--brand);
 }
 
 .pos {
@@ -23,8 +24,34 @@
 .segment {
   display: flex;
   flex-direction: row;
-  gap: var(--size-2);
+  flex-wrap: wrap;
+  border: var(--border-size-2) solid transparent;
+  border-radius: var(--radius-2);
+  gap: var(--size-1);
+  max-width: 100%;
   width: fit-content;
+  padding: var(--size-2);
+  opacity: 0;
+  animation: var(--animation-fade-in) forwards;
+  &:not(.selected){
+    animation-delay: min(calc(var(--index) * 50ms), 300ms);
+    &:hover {
+      box-shadow: var(--shadow-3);
+      border-color: var(--brand);
+    }
+  }
+  &.selected {
+    animation-delay: 0;
+    border-color: var(--brand);
+  }
+  transition: all .3s var(--ease-3);
+}
+
+.segment-container {
+  display: flex;
+  flex-direction: column;
+  padding: var(--size-fluid-1);
+  background-color: var(--surface-2);
 }
 
 .card {
@@ -35,9 +62,6 @@
   animation: var(--animation-fade-in-out);
   cursor: pointer;
 
-  &:hover {
-    box-shadow: var(--shadow-3);
-  }
 }
 
 .english {
@@ -46,4 +70,8 @@
 
 .spanish {
   background-color: var(--color-spanish);
+}
+
+.loading {
+  font-size: var(--font-size-4);
 }
