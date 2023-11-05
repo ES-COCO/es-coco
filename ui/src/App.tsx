@@ -1,11 +1,10 @@
-import { For, Component, createSignal, Show, createEffect } from "solid-js";
+import { Component, createSignal, Show, createEffect } from "solid-js";
 import { db, queryToIds } from "./sql";
 import "./App.css";
-import { Segment, SegmentData, fetchSegments } from "./components/Segment";
+import { SegmentData, fetchSegments } from "./components/Segment";
 import { DataSource } from "./components/DataSource";
 
 const App: Component = () => {
-  const [segments, setSegments] = createSignal<SegmentData[]>([]);
   const [selectedSegment, setSelectedSegment] = createSignal<SegmentData>();
   createEffect(() => {
     db(); // Force initial value to get set after DB load.
@@ -15,10 +14,12 @@ const App: Component = () => {
     FROM WordAnnotations AS a
     JOIN Words AS w ON a.word_id = w.id
     JOIN Segments AS s ON w.segment_id = s.id
-    WHERE a.annotation_type_id = (SELECT id from AnnotationTypes WHERE name = 'switch');
+    WHERE a.annotation_type_id = (SELECT id from AnnotationTypes WHERE name = 'switch')
+    ORDER BY s.start_ms
+    LIMIT 2;
     `,
     );
-    setSegments(fetchSegments(segmentIds));
+    setSelectedSegment(fetchSegments(segmentIds)[1]);
   });
 
   return (
@@ -26,20 +27,7 @@ const App: Component = () => {
       <Show when={db()} fallback={<p class="loading">Loading...</p>}>
         <Show
           when={selectedSegment() !== undefined}
-          fallback={
-            <div class="segment-container">
-              <For each={segments()}>
-                {(s, i) => (
-                  <Segment
-                    index={i()}
-                    data={s}
-                    selectedSegment={selectedSegment}
-                    onClick={() => setSelectedSegment(s)}
-                  />
-                )}
-              </For>
-            </div>
-          }
+          fallback={<p class="loading">Loading...</p>}
         >
           <DataSource
             id={selectedSegment()!.dataSourceId}
