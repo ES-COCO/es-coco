@@ -1,0 +1,22 @@
+.token {
+  display: inline-flex;
+  flex-direction: column;
+  align-content: center;
+  align-items: center;
+  border-radius: var(--radius-2);
+  padding: var(--size-2);
+}
+
+.pos {
+  font-size: var(--font-size-00);
+  font-variant: small-caps;
+  color: var(--text-2);
+}
+
+.english {
+  background-color: var(--color-english);
+}
+
+.spanish {
+  background-color: var(--color-spanish);
+}

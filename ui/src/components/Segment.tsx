@@ -1,7 +1,8 @@
-import { For, Component, JSX, onMount } from "solid-js";
+import { For, Component, JSX, Accessor, createEffect } from "solid-js";
 import { Word, fetchWords } from "./Word";
 import { db, placeholders, queryToIds, queryToMaps } from "../sql";
 import { z } from "zod";
+import "./Segment.css";
 
 export const SegmentData = z.object({
   id: z.number(),
@@ -36,13 +37,27 @@ export function fetchSegments(segmentIds: number[]): SegmentData[] {
   );
   return Array.from(segments.values());
 }
+
+function padDigits(x: number) {
+  x = Math.round(x);
+  return `${x < 10 ? "0" : ""}${x}`;
+}
+
+function formatTime(ms: number) {
+  let seconds = ms / 1000;
+  let hours = Math.floor(seconds / 3600);
+  let minutes = Math.floor((seconds - hours * 3600) / 60);
+  seconds = seconds - hours * 3600 - minutes * 60;
+  return `${padDigits(hours)}:${padDigits(minutes)}:${padDigits(seconds)}`;
+}
+
 export const Segment: Component<{
   index: number;
   data: SegmentData;
-  selected: boolean;
+  selectedSegment: Accessor<SegmentData | undefined>;
   onClick?: JSX.EventHandlerUnion<HTMLDivElement, MouseEvent>;
 }> = (props) => {
-  const { index, data, selected, onClick } = props;
+  const { index, data, selectedSegment, onClick } = props;
   const wordIds = queryToIds(
     `
     SELECT id
@@ -54,11 +69,11 @@ export const Segment: Component<{
   const words = fetchWords(wordIds);
 
   let ref: HTMLDivElement | undefined;
-  if (selected) {
-    onMount(() => {
+  createEffect(() => {
+    if (data.id === selectedSegment()?.id) {
       ref?.scrollIntoView({ behavior: "smooth", block: "center" });
-    });
-  }
+    }
+  });
   return (
     <div
       ref={ref}
@@ -66,10 +81,17 @@ export const Segment: Component<{
       style={`--index: ${index};`}
       classList={{
         segment: true,
-        selected,
+        selected: data.id === selectedSegment()?.id,
       }}
     >
-      <For each={words}>{(w) => <Word data={w} />}</For>
+      <div class="timestamps">
+        <span>{formatTime(data.start)}</span>
+        <span>-</span>
+        <span>{formatTime(data.end)}</span>
+      </div>
+      <div class="segment-words">
+        <For each={words}>{(w) => <Word data={w} />}</For>
+      </div>
     </div>
   );
 };

@@ -1,50 +1,12 @@
-import {
-  For,
-  Component,
-  createSignal,
-  Signal,
-  Show,
-  createEffect,
-} from "solid-js";
+import { For, Component, createSignal, Show, createEffect } from "solid-js";
 import { db, queryToIds } from "./sql";
 import "./App.css";
 import { Segment, SegmentData, fetchSegments } from "./components/Segment";
-
-const SegmentContainer: Component<{ segmentsSignal: Signal<SegmentData[]> }> = (
-  props,
-) => {
-  const [segments, setSegments] = props.segmentsSignal;
-  const [selectedSegmentId, setSelectedSegmentId] = createSignal<number>();
-  const selectSegment = (segment: SegmentData) => {
-    const segmentIds = queryToIds(
-      `
-        SELECT id
-        FROM Segments
-        WHERE data_source_id = ?
-      `,
-      segment.dataSourceId,
-    );
-    setSelectedSegmentId(segment.id);
-    setSegments(fetchSegments(segmentIds));
-  };
-  return (
-    <div classList={{ ["segment-container"]: true }}>
-      <For each={segments()}>
-        {(s, i) => (
-          <Segment
-            index={i()}
-            data={s}
-            selected={s.id === selectedSegmentId()}
-            onClick={() => selectSegment(s)}
-          />
-        )}
-      </For>
-    </div>
-  );
-};
+import { DataSource } from "./components/DataSource";
 
 const App: Component = () => {
   const [segments, setSegments] = createSignal<SegmentData[]>([]);
+  const [selectedSegment, setSelectedSegment] = createSignal<SegmentData>();
   createEffect(() => {
     db(); // Force initial value to get set after DB load.
     const segmentIds = queryToIds(
@@ -62,7 +24,28 @@ const App: Component = () => {
   return (
     <div class="app">
       <Show when={db()} fallback={<p class="loading">Loading...</p>}>
-        <SegmentContainer segmentsSignal={[segments, setSegments]} />
+        <Show
+          when={selectedSegment() !== undefined}
+          fallback={
+            <div class="segment-container">
+              <For each={segments()}>
+                {(s, i) => (
+                  <Segment
+                    index={i()}
+                    data={s}
+                    selectedSegment={selectedSegment}
+                    onClick={() => setSelectedSegment(s)}
+                  />
+                )}
+              </For>
+            </div>
+          }
+        >
+          <DataSource
+            id={selectedSegment()!.dataSourceId}
+            initialSelectedSegment={selectedSegment()!}
+          />
+        </Show>
       </Show>
     </div>
   );

@@ -1,6 +1,7 @@
 import { Component } from "solid-js";
 import { placeholders, queryToMaps } from "../sql";
 import { z } from "zod";
+import "./Word.css";
 
 export const WordAnnotationData = z.object({
   id: z.number(),
@@ -70,7 +71,9 @@ export const Word: Component<{ data: WordData }> = (props) => {
       }}
     >
       {d.surfaceForm.replace("##", "")}
-      <div class="pos">{d.surfaceForm.match(/[0-9.'",!?]/) ? undefined : tag }</div>
+      <div class="pos">
+        {d.surfaceForm.match(/[0-9.'",!?¿]/) ? undefined : tag}
+      </div>
     </div>
   );
 };
