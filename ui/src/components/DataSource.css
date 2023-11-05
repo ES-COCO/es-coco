@@ -2,8 +2,6 @@
   display: flex;
   flex-direction: column;
   max-height: 96vh;
-  background-color: var(--surface-2);
-  border-radius: var(--radius-2);
   padding: var(--size-fluid-1);
 }
 
@@ -31,7 +29,6 @@
 .data-source-segments {
   display: flex;
   flex-direction: column;
-  /* padding: var(--size-fluid-1); */
   background-color: var(--surface-3);
   border-radius: var(--radius-2);
   box-shadow: var(--inner-shadow-2);

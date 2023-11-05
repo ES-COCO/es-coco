@@ -14,12 +14,12 @@
     animation-delay: min(calc(var(--index) * 50ms), 300ms);
     &:hover {
       box-shadow: var(--shadow-3);
-      background-color: var(--surface-2);
+      background-color: var(--surface-1);
     }
   }
   &.selected {
     animation-delay: 0;
-    background-color: var(--surface-2);
+    background-color: var(--surface-1);
   }
   transition: all 0.3s var(--ease-3);
   cursor: pointer;

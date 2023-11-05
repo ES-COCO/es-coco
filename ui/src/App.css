@@ -16,5 +16,4 @@
   padding: var(--size-fluid-1);
   box-shadow: var(--shadow-2);
   animation: var(--animation-fade-in-out);
-  cursor: pointer;
 }

@@ -52,7 +52,7 @@ export const DataSource: Component<{
     initialSelectedSegment,
   );
   return (
-    <div class="data-source card">
+    <div class="data-source">
       <div class="data-source-header">
         <div class="data-source-metadata">
           <a class="source-name" href={data.url}>
